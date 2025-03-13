@@ -1,4 +1,4 @@
-#PharManager Bot
+# **PharManager Bot**
 
 ## Languages
 -[Русский](#описание)
