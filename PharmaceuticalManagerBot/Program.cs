@@ -22,7 +22,8 @@ internal class Program
         using (var scope = scopeFactory.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<PharmaceuticalManagerBotContext>();
-            if (db.Database.EnsureCreated()) { }
+            //If the database is created, the medication types will be seeded to the db
+            if (db.Database.EnsureCreated()) { SeedMedTypes.Initialise(db); }
         }
 
 
