@@ -1,8 +1,8 @@
 # **PharManager Bot**
 
 ## Languages
--[Русский](#описание)
--[English](#description)
+- [Русский](#описание)
+- [English](#description)
 
 # Описание
 
