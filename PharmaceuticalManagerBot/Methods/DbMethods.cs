@@ -9,7 +9,9 @@ using System.Net.Sockets;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace PharmaceuticalManagerBot.Methods
 {
@@ -119,8 +121,10 @@ namespace PharmaceuticalManagerBot.Methods
             }
         }
 
-        public async Task<List<MedicineDto>> GetAllMedShort (long userTgId)
+        public async Task GetMedList (ITelegramBotClient botClient, long userTgId, long chatId, int page = 0)
         {
+            const int pageSize= 5;
+
             int userId = _context.Users.Where(u => u.TgId == userTgId).Select(u => u.UID).Single();
             var medListShort = await _context.Medicines
                 .Where(m => m.UserId == userId)
@@ -131,14 +135,20 @@ namespace PharmaceuticalManagerBot.Methods
                     ExpiryDate = m.ExpiryDate
                 })
                 .ToListAsync();
-            if (medListShort.Count() > 0)
-            {
-                return medListShort;
-            }
-            else
-            {
-                throw new Exception("Вы не добавили ещё ни одного препарата в свой список.");
-            }
+
+            var medPage = medListShort
+                .Skip(page * pageSize)
+                .Take(pageSize)
+                .ToList();
+            var buttons = medPage
+                .Select(m => new[]
+                {
+                    InlineKeyboardButton.WithCallbackData(
+                        text: $"{m.Name}",
+                        callbackData: $"med_{m.Id}")
+                })
+                .ToList();
+            
         }
         public async Task<MedicineDto> GetSingleMed (int medId)
         {
@@ -189,6 +199,12 @@ namespace PharmaceuticalManagerBot.Methods
                 _logger.LogError($"Ошибка добавления активного вещества: {ex.Message}");
                 return 0;
             }
+        }
+
+        public string GetMedTypes()
+        {
+            var medTypes = _context.MedTypes.Select(m => m);
+            return "**Типы лекарственных средств и их порядковый номер:**\n" + string.Join("\n", medTypes.Select(m => $"{m.ID}) {m.Type}"));
         }
 
         public async Task EnableAutoCheck(long userTgId)
@@ -272,38 +288,27 @@ namespace PharmaceuticalManagerBot.Methods
 
         }
 
-        public async Task<bool> DeleteUser(long userTgId)
+        public async Task DeleteUser(long userTgId)
         {
             try
             {
                 bool userExists = await _context.Users.AnyAsync(u => u.TgId == userTgId);
-                if (userExists)
-                {                    
-                    var removeUser = await _context.Users
+
+                var removeUser = await _context.Users
                         .Include(u => u.Medicines)
                         .FirstOrDefaultAsync(u => u.TgId == userTgId);
-                    if (removeUser != null)
-                    {
-                        _context.Users.Remove(removeUser);
-                        await _context.SaveChangesAsync();
-                        _logger.LogInformation($"Пользователь {userTgId} и все связянные с ним записи были удалены.");
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                }
-                else
+                if (removeUser != null)
                 {
-                    return false;
+                    _context.Users.Remove(removeUser);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation($"Пользователь {userTgId} и все связянные с ним записи были удалены.");
                 }
-                return true;
+                
             }
             catch (DbUpdateException ex)
             {
                 // Логирование ошибки
                 _logger.LogError($"Ошибка удаления пользователя: {ex.Message}");
-                return false;
             }
         }
         

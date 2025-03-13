@@ -14,7 +14,7 @@ namespace PharmaceuticalManagerBot
     public class PharmaceuticalManagerBotWorker : BackgroundService
     {
         private readonly ILogger<PharmaceuticalManagerBotWorker> _logger;
-        private readonly ITelegramBotClient _botClient;
+        private readonly ITelegramBotClient _botClient;        
         private readonly IUserStateTracker _userState;
         private readonly CancellationTokenSource _cts = new();
 
@@ -58,10 +58,12 @@ namespace PharmaceuticalManagerBot
 
         private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
-            
+            //Track a state of the chat
             var userState = _userState;
+            //Methods to interract with DB
             DbMethods dbMethods = new();
 
+            //Interract with user's messages
             if (update.Type == UpdateType.Message)
             {
                 var msg = update.Message;
@@ -73,30 +75,40 @@ namespace PharmaceuticalManagerBot
 
                         switch (msg.Text)
                         {
+                            //Greets and adds user to the DB, 
                             case "/start":
                                 bool userAdded = await dbMethods.AddUser(msg.From.Id, msg.Chat.Id);
                                 if (userAdded)
                                 {
                                     await botClient.SendMessage(
                                     chatId: msg.Chat,
-                                    text: $"Привет {msg.Chat.FirstName}! Я аптечный менеджер и помогу тебе следить за сроком годности препаратов. Для полного списка команд отправь /help");
+                                    text: $"Привет {msg.Chat.FirstName}! Я аптечный менеджер и помогу тебе следить за сроком годности препаратов. Для полного списка команд отправь /help. Советую вам начать с команды /show_types, чтобы получить список с порядковыми номерами типов лекарственных средств и закрепить этот список.");
                                 }
                                 break;
+                            //Sends an instruction to a user on how to write a request to add a emd to the DB + sets a state for user to track the next message
                             case "/add":
                                 await botClient.SendMessage(
                                     chatId: msg.Chat,
                                     text: "Чтобы добавить препарат, отправь данные в следующем формате: Название|Активное вещество|Тип препарата (номер из списка)|Срок годности (дд-мм-гггг)\nПример: Ибуметин 400мг|Ибупрофен|14|28-10-2028");
                                 _userState.SetState(msg.Chat.Id, "GET_MED_DETAILS");
                                 break;
+                            //Shows a list of all user's meds
                             case "/show":
                                 
                                 break;
+                            //Shows a list of types of medications with their IDs
                             case "/show_types":
+                                var importantMessage = await _botClient.SendMessage(
+                                    chatId: msg.Chat,
+                                    text: dbMethods.GetMedTypes());
                                 break;
+                            //Shows a list of meds that are soon to expire
                             case "/expire_soon":
                                 break;
+                            //Shows a list of meds that are expired
                             case "/show_expired":
                                 break;
+                            //Enable automatic check for the meds that are soon to expire
                             case "/auto_check":
                                 try
                                 {
@@ -113,6 +125,7 @@ namespace PharmaceuticalManagerBot
                                 }
                                 
                                 break;
+                            //Disable automatic check for the meds that are soon to expire
                             case "/auto_check_disable":
                                 try
                                 {
@@ -128,6 +141,7 @@ namespace PharmaceuticalManagerBot
                                         text: ex.Message);
                                 }
                                 break;
+                            //This is a help command that describes what other commands do
                             case "/help":
                                 await botClient.SendMessage(
                                     chatId: msg.Chat,
@@ -150,9 +164,16 @@ namespace PharmaceuticalManagerBot
                         string state = userState.GetState(msg.Chat.Id);
                         switch (state)
                         {
+                            //Message under this state is expected to have a string with med details
                             case "GET_MED_DETAILS":
                                 try
                                 {
+                                    //Cancellation 
+                                    if (msg.Text.ToLowerInvariant().Equals("отмена"))
+                                    {
+                                        userState.RemoveState(msg.Chat.Id);
+                                        break;
+                                    }
                                     bool isComplete = await dbMethods.AddMed(msg.From.Id, msg.Text);
 
                                     if (isComplete)
@@ -161,12 +182,15 @@ namespace PharmaceuticalManagerBot
                                             chatId: msg.Chat,
                                             text: "Поздравляю! Препарат был успешно добавлен!");
                                         _logger.LogInformation($"Препарат успешно добавлен для пользователя {msg.From.Id}");
+                                        userState.RemoveState(msg.Chat.Id);
+                                        break;
+
                                     }
                                     else
                                     {
                                         await botClient.SendMessage(
                                             chatId: msg.Chat,
-                                            text: "Произошла ошибка при добавлении препарата! Пожалуйста, перепроверьте данные и повторите запрос чуть позже.");
+                                            text: "Произошла ошибка при добавлении препарата! Пожалуйста, перепроверьте данные и повторите запрос чуть позже.Если вы передумали добавлять препарат, то напишите \"отмена\"");
                                         _logger.LogInformation($"Ошибка при добавлении препарата для пользователя {msg.From.Id}");
                                     }
                                 }
@@ -177,6 +201,12 @@ namespace PharmaceuticalManagerBot
                                         text: ex.Message);
                                     _logger.LogError($"Ошибка при добавлении препарата для {msg.From.Id}.\nОшибка: {ex.Message}");
                                 }
+
+                                await botClient.SendMessage(
+                                            chatId: msg.Chat,
+                                            text: "Произошла ошибка при добавлении препарата! Пожалуйста, перепроверьте данные и повторите запрос чуть позже.Если вы передумали добавлять препарат, то напишите \"отмена\"");
+                                _logger.LogInformation($"Ошибка при добавлении препарата для пользователя {msg.From.Id}");
+
                                 break;
                             default:
                                 await botClient.SendMessage(
@@ -193,6 +223,7 @@ namespace PharmaceuticalManagerBot
                     _logger.LogError(ex, "Ошибка обработки сообщения");
                 }
             }
+            //Interract with user's nav buttons
             else if (update.Type == UpdateType.CallbackQuery)
             {
                 return;

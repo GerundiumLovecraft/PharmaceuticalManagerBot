@@ -14,6 +14,7 @@ internal class Program
         builder.Services.AddHostedService<PharmaceuticalManagerBotWorker>();
         builder.Services.AddDbContext<PharmaceuticalManagerBotContext>(options => options.UseNpgsql(secret["PostgresDatabase"]));
         builder.Services.AddSingleton<IUserStateTracker, UserStateTracker>();
+        builder.Services.AddHostedService<ExpiryNotificationService>();
 
         var host = builder.Build();
 
