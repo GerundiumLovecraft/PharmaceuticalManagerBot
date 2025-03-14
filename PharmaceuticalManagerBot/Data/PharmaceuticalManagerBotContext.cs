@@ -30,11 +30,30 @@ namespace PharmaceuticalManagerBot.Data
                 .HasForeignKey(e => e.UserId)
                 .IsRequired();
 
-            modelBuilder.Entity<MedType>()
-                .HasMany(e => e.Medicines)
+            modelBuilder.Entity<MedType>(m =>
+            {
+                m.HasData(
+                new { ID = 1, Type = "Обезболивающие и противовоспалительные" },
+                new { ID = 2, Type = "Жаропонижающие" },
+                new { ID = 3, Type = "Антибиотики" },
+                new { ID = 4, Type = "Противовирусные" },
+                new { ID = 5, Type = "Антигистаминные" },
+                new { ID = 6, Type = "Сердечно-сосудистые" },
+                new { ID = 7, Type = "Желудочно-кишечные" },
+                new { ID = 8, Type = "Антидепрессанты и анксиолитики" },
+                new { ID = 9, Type = "Гормональные препараты" },
+                new { ID = 10, Type = "Витамины и минералы" },
+                new { ID = 11, Type = "Противогрибковые" },
+                new { ID = 12, Type = "Препараты для дыхательной системы" },
+                new { ID = 13, Type = "Онкологические (противоопухолевые)" },
+                new { ID = 14, Type = "Анестетики" },
+                new { ID = 15, Type = "Иммуномодуляторы" }
+                );
+                m.HasMany(e => e.Medicines)
                 .WithOne(e => e.MedType)
                 .HasForeignKey(e => e.TypeId)
                 .IsRequired();
+            });
 
             modelBuilder.Entity<ActivePharmIngredient>()
                 .HasMany(e => e.Medicines)
