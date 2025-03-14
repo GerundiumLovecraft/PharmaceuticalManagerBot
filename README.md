@@ -22,7 +22,7 @@ PharManager — телеграм бот для ведения учёта за л
     ```bash
     dotnet restore
     ```
-4. Настройте конфигурационные файлы (для своего проекта я использовал secrets.js):
+4. Настройте конфигурационные файлы (для своего проекта я использовал secrets.json):
    - токен телеграм бота
    - строка для подключения к PostgreSQL серверу
 5. Запуск
@@ -67,7 +67,7 @@ The bot communicates in Russian only at the moment, addition of English is in th
     ```bash
     dotnet restore
     ```
-3. Setup the secrets:
+3. Setup the secrets.json:
    - Telegram bot token
    - PostgreSQL connection string
 4. Run
