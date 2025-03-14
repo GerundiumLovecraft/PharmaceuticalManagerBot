@@ -14,14 +14,14 @@ namespace PharmaceuticalManagerBot
     public class PharmaceuticalManagerBotWorker : BackgroundService
     {
         private readonly ILogger<PharmaceuticalManagerBotWorker> _logger;
-        private readonly ITelegramBotClient _botClient;        
+        private readonly ITelegramBotClient _botClient;
         private readonly IUserStateTracker _userState;
         private readonly CancellationTokenSource _cts = new();
 
-        public PharmaceuticalManagerBotWorker(ILogger<PharmaceuticalManagerBotWorker> logger, IConfiguration config)
+        public PharmaceuticalManagerBotWorker(ILogger<PharmaceuticalManagerBotWorker> logger, ITelegramBotClient botClient, IConfiguration config)
         {
             _logger = logger;
-            _botClient = new TelegramBotClient(config["TelegramApiKey"]);
+            _botClient = botClient;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)

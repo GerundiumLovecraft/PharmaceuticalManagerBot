@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 using PharmaceuticalManagerBot.Data;
 using Microsoft.Extensions.Configuration;
+using Telegram.Bot;
 
 internal class Program
 {
@@ -11,15 +12,17 @@ internal class Program
     {
         var builder = Host.CreateApplicationBuilder(args);
         var secret = builder.Configuration;
-        builder.Services.AddHostedService<PharmaceuticalManagerBotWorker>();
-        builder.Services.AddDbContext<PharmaceuticalManagerBotContext>(options => options.UseNpgsql(secret["PostgresDatabase"]));
+        builder.Services.AddSingleton<ITelegramBotClient>(new TelegramBotClient(secret["TelegramApiKey"]));
         builder.Services.AddSingleton<IUserStateTracker, UserStateTracker>();
         builder.Services.AddHostedService<ExpiryNotificationService>();
+        builder.Services.AddHostedService<PharmaceuticalManagerBotWorker>();
+        builder.Services.AddDbContext<PharmaceuticalManagerBotContext>(options => options.UseNpgsql(secret["PostgresDatabase"]));
+        
 
         var host = builder.Build();
 
-        var scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();
-        using (var scope = scopeFactory.CreateScope())
+        IServiceScopeFactory scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();
+        using (IServiceScope scope = scopeFactory.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<PharmaceuticalManagerBotContext>();
             //If the database is created, the medication types will be seeded to the db

@@ -140,6 +140,7 @@ namespace PharmaceuticalManagerBot.Methods
                 .Skip(page * pageSize)
                 .Take(pageSize)
                 .ToList();
+            //put med information into the buttons and create a list with buttons
             var buttons = medPage
                 .Select(m => new[]
                 {
