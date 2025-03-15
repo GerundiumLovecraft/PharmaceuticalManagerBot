@@ -47,7 +47,9 @@ namespace PharmaceuticalManagerBot.Data
                 new { ID = 12, Type = "Препараты для дыхательной системы" },
                 new { ID = 13, Type = "Онкологические (противоопухолевые)" },
                 new { ID = 14, Type = "Анестетики" },
-                new { ID = 15, Type = "Иммуномодуляторы" }
+                new { ID = 15, Type = "Иммуномодуляторы" },
+                new { ID = 16, Type = "Спазмолитик" },
+                new { ID = 17, Type = "Другое"}
                 );
                 m.HasMany(e => e.Medicines)
                 .WithOne(e => e.MedType)
