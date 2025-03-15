@@ -31,7 +31,7 @@ namespace PharmaceuticalManagerBot.Methods
             _botClient = botClient;
         }
 
-        public async Task<bool> AddUser(BigInteger userTgId, BigInteger userChatId)
+        public async Task<bool> AddUser( BigInteger userTgId, BigInteger userChatId)
         {
             try
             {
@@ -91,44 +91,6 @@ namespace PharmaceuticalManagerBot.Methods
                 throw new Exception("Произошла ошибка при добавлении препарата. Повторите ошибку чуть позже.");
             }
 
-        }
-
-        public async Task<List<MedicineDto>> GetAllMedLong (long userTgId)
-        {
-            int userId = _context.Users.Where(u => u.TgId == userTgId).Select(u => u.UID).Single();
-            var medList = await  _context.Medicines
-                .Where(m => m.UserId == userId)
-                .Join(_context.ActivePharmIngedients,
-                m => m.ActivePharmIngredientId,
-                a => a.ID,
-                (m, a) => new
-                {
-                    ID = m.MedicineId,
-                    Name = m.Name,
-                    Active = a.ActivePharmIngredientName,
-                    TypeId = m.TypeId,
-                    ExpDate = m.ExpiryDate
-                })
-                .Join(_context.MedTypes,
-                m => m.TypeId,
-                t => t.ID,
-                (m, t) => new MedicineDto
-                {
-                    Id = m.ID,
-                    Name = m.Name,
-                    ActiveIngredient = m.Active,
-                    Type = t.Type,
-                    ExpiryDate = m.ExpDate
-                })
-                .ToListAsync();
-            if (medList.Count > 0)
-            {
-                return medList;
-            }
-            else
-            {
-                throw new Exception("Вы не добавили ещё ни одного препарата в свой список.");
-            }
         }
 
         public async Task GetMedList (ITelegramBotClient botClient, long userTgId, long chatId, int page = 0)

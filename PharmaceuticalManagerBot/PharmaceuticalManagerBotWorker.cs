@@ -88,7 +88,7 @@ namespace PharmaceuticalManagerBot
                                     {
                                         await botClient.SendMessage(
                                         chatId: msg.Chat,
-                                        text: $"Привет {msg.Chat.FirstName}! Я аптечный менеджер и помогу тебе следить за сроком годности препаратов. Для полного списка команд отправь /help. Советую вам начать с команды /show_types, чтобы получить список с порядковыми номерами типов лекарственных средств и закрепить этот список.");
+                                        text: $"Привет {msg.Chat.FirstName}! Я аптечный менеджер и помогу тебе следить за сроком годности препаратов. Для полного списка команд отправь /help. Советую ам начать с команды /show_types, чтобы получить список с порядковыми номерами типов лекарственных средств и закрепить этот список.");
                                     }
                                     break;
                                 //Sends an instruction to a user on how to write a request to add a emd to the DB + sets a state for user to track the next message
@@ -161,11 +161,6 @@ namespace PharmaceuticalManagerBot
                                         text: "Для взаимодействия с ботом, пожалуйста, используйте только указанные команды.");
                                     break;
                             }
-
-                            await botClient.SendMessage(
-                                chatId: msg.Chat,
-                                text: "Привет! Я работаю как фоновая служба!",
-                                cancellationToken: cancellationToken);
                         }
                         else if (userState.GetState(msg.Chat.Id) != null)
                         {
