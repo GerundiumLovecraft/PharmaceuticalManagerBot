@@ -69,13 +69,15 @@ namespace PharmaceuticalManagerBot
                 var expiringMedByUser = expiringMed
                     .GroupBy(m => m.User)
                     .ToList();
+                string dateFormat = "d";
                 //send messages to each user that has soon to expire meds
                 foreach (var group in expiringMedByUser)
                 {
                     var user = group.Key;
                     var userMed = group.ToList();
 
-                    var message = "**Срок годности истекает:**\n" + string.Join("\n", userMed.Select(m => $"- {m.Name} ({m.ExpiryDate:dd.MM.yyyy})"));
+
+                    var message = "**Срок годности истекает:**\n" + string.Join("\n", userMed.Select(m => $"- {m.Name} ({m.ExpiryDate.ToString(dateFormat)})"));
                     try
                     {
                         await _botClient.SendMessage(

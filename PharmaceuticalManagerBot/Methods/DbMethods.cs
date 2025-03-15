@@ -72,17 +72,24 @@ namespace PharmaceuticalManagerBot.Methods
             int medType = int.Parse(medDetails[2]);
             int medActiveId = await GetActivePharmId(medDetails[1]);
             DateOnly medExp = DateOnly.Parse(medDetails[3]);
-            var newMed = new Medicine
-            {
-                Name = medName,
-                UserId = userId,
-                ActivePharmIngredientId = medActiveId,
-                TypeId = medType,
-                ExpiryDate = medExp
-            };
+            //var newMed = new Medicine
+            //{
+            //    Name = medName,
+            //    UserId = userId,
+            //    ActivePharmIngredientId = medActiveId,
+            //    TypeId = medType,
+            //    ExpiryDate = medExp
+            //};
             try
             {
-                _context.Medicines.Add(newMed);
+                _context.Medicines.Add(new Medicine
+                {
+                    Name = medName,
+                    UserId = userId,
+                    ActivePharmIngredientId = medActiveId,
+                    TypeId = medType,
+                    ExpiryDate = medExp
+                });
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateException ex)
@@ -107,6 +114,14 @@ namespace PharmaceuticalManagerBot.Methods
                     ExpiryDate = m.ExpiryDate
                 })
                 .ToListAsync();
+
+            if (medListShort.Count == 0)
+            {
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text: "Вы ещё не добавили ни одного препарата.");
+                return;
+            }
 
             var medPage = medListShort
                 .Skip(page * pageSize)
@@ -145,7 +160,7 @@ namespace PharmaceuticalManagerBot.Methods
 
             await botClient.SendMessage(
                 chatId: chatId,
-                text: $"Страница {page} из {Math.Ceiling((double)(medListShort.Count / pageSize))}",
+                text: $"Страница {page+1} из {(int)Math.Round((double)(medListShort.Count / pageSize))}",
                 replyMarkup: inlineKeyboard
                 );
         }
@@ -172,24 +187,26 @@ namespace PharmaceuticalManagerBot.Methods
 
                 if (soonExpMeds != null && soonExpMeds.Count > 0)
                 {
-                    string answerString = "**Срок годности истекает:**\n" + string.Join("\n", soonExpMeds.Select(m => $"- {m.Name} ({m.ExpiryDate:dd.MM.yyyy})"));
+                    string dateFormat = "d";
+                    string answerString = "<b>Срок годности истекает:</b>\n" + string.Join("\n", soonExpMeds.Select(m => $"- {m.Name} ({m.ExpiryDate.ToString(dateFormat)})"));
 
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: answerString);
+                        text: answerString,
+                        parseMode: Telegram.Bot.Types.Enums.ParseMode.Html);
                 }
                 else
                 {
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: "Можете спать спокойно. Все ваши лекарства и препараты в полном порядке");
+                        text: "Можешь спать спокойно. Все твои лекарства и препараты в полном порядке");
                 }
             }
             else
             {
                 await botClient.SendMessage(
                         chatId: chatId,
-                        text: "Произошла ошибка. Пожалуйста, вбейте команду /start и повторите запрос");
+                        text: "Произошла ошибка. Пожалуйста, вбей команду /start и повтори запрос");
                 _logger.LogInformation($"Ошибка поиска по ТГ айдишке для пользователя {userTgId}");
             }
 
@@ -215,24 +232,26 @@ namespace PharmaceuticalManagerBot.Methods
 
                 if (expMeds != null && expMeds.Count > 0)
                 {
-                    string answerString = "**Срок годности истёк для:**\n" + string.Join("\n", expMeds.Select(m => $"- {m.Name} ({m.ExpiryDate:dd.MM.yyyy})"));
+                    string dateFormat = "d";
+                    string answerString = "<b>Срок годности истёк для:</b>\n" + string.Join("\n", expMeds.Select(m => $"- {m.Name} ({m.ExpiryDate.ToString(dateFormat)})"));
 
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: answerString);
+                        text: answerString,
+                        parseMode: Telegram.Bot.Types.Enums.ParseMode.Html);
                 }
                 else
                 {
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: "Можете спать спокойно. В вашей аптечке нет просроченных препаратов.");
+                        text: "Можешь спать спокойно. В твоей аптечке нет просроченных препаратов.");
                 }
             }
             else
             {
                 await botClient.SendMessage(
                     chatId: chatId,
-                    text: "Ошибка при поиске информации. Повторите запрос чуть позже.");
+                    text: "Ошибка при поиске информации. Повтори запрос чуть позже.");
                 _logger.LogInformation($"Ошибка при поиске по ТГ айдишке пользователя {userTgId}");
             }
 
@@ -246,6 +265,7 @@ namespace PharmaceuticalManagerBot.Methods
             {
                 string activePhar = _context.ActivePharmIngedients.Where(a => a.ID == medInfo.ActivePharmIngredientId).Select(a => a.ActivePharmIngredientName).Single();
                 string medType = _context.MedTypes.Where(m => m.ID == medInfo.TypeId).Select(m => m.Type).Single();
+                string dateFormat = "d";
                 MedicineDto result = new MedicineDto
                 {
                     Id = medInfo.MedicineId,
@@ -256,18 +276,18 @@ namespace PharmaceuticalManagerBot.Methods
                 };
                 await botClient.SendMessage(
                     chatId: chatId,
-                    text: $"Название: {result.Name}\n" + $"Активное вещество: {result.ActiveIngredient}\n" + $"Тип лекарства: {result.Type}\n" + $"Срок годности истекает: {result.ExpiryDate:dd:MM:yyyy}",
+                    text: $"Название: {result.Name}\n" + $"Активное вещество: {result.ActiveIngredient}\n" + $"Тип лекарства: {result.Type}\n" + $"Срок годности истекает: {result.ExpiryDate.ToString(dateFormat)}",
                     replyMarkup: new[] 
                     {
-                        InlineKeyboardButton.WithCallbackData("закрыть", $"close_"),
-                        InlineKeyboardButton.WithCallbackData("Удалить?", $"delete_{result.Id}")
+                        InlineKeyboardButton.WithCallbackData("Закрыть", $"close_"),
+                        InlineKeyboardButton.WithCallbackData("Удалить", $"delete_{result.Id}")
                     });
             }
             else
             {
                 await botClient.SendMessage(
                     chatId: chatId,
-                    text: "Извините, мы не смогли найти этот препарат.");
+                    text: "Извини, я не смог найти этот препарат.");
                 _logger.LogInformation($"Проблема с поиском препарата с порядковым номером {medId}");
             }
         }
@@ -276,17 +296,22 @@ namespace PharmaceuticalManagerBot.Methods
 
         private async Task<int> GetActivePharmId (string activePharmName)
         {
-            bool activeExist = await _context.ActivePharmIngedients.AnyAsync(a => String.Equals(a.ActivePharmIngredientName, activePharmName, StringComparison.OrdinalIgnoreCase));
+            string prepString = activePharmName.ToLower();
+            bool activeExist = await _context.ActivePharmIngedients
+                .AnyAsync(p => p.ActivePharmIngredientName == prepString);
             int activeId;
             try
             {
                 if (activeExist)
                 {
-                    activeId = _context.ActivePharmIngedients.Where(a => String.Equals(a.ActivePharmIngredientName, activePharmName, StringComparison.OrdinalIgnoreCase)).Select(a => a.ID).Single();
+                    activeId = _context.ActivePharmIngedients
+                        .Where(a => a.ActivePharmIngredientName.Equals(prepString))
+                        .Select(a => a.ID)
+                        .Single();
                 }
                 else
                 {
-                    var newActive = new ActivePharmIngredient { ActivePharmIngredientName = activePharmName };
+                    var newActive = new ActivePharmIngredient { ActivePharmIngredientName = prepString };
                     activeId = newActive.ID;
                     _context.ActivePharmIngedients.Add(newActive);
                     await _context.SaveChangesAsync();
@@ -296,14 +321,14 @@ namespace PharmaceuticalManagerBot.Methods
             catch (DbUpdateException ex)
             {
                 _logger.LogError($"Ошибка добавления активного вещества: {ex.Message}");
-                throw new Exception("Произошла ошибка при добавлении препарата. Пожалуйста, повторите попытку чуть позже.");
+                throw new Exception("Произошла ошибка при добавлении препарата. Пожалуйста, повтори попытку чуть позже.");
             }
         }
 
         public string GetMedTypes()
         {
             var medTypes = _context.MedTypes.Select(m => m);
-            return "**Типы лекарственных средств и их порядковый номер:**\n" + string.Join("\n", medTypes.Select(m => $"{m.ID}) {m.Type}"));
+            return "<b>Типы лекарственных средств и их порядковый номер:</b>\n" + string.Join("\n", medTypes.Select(m => $"{m.ID}) {m.Type}"));
         }
 
         public async Task EnableAutoCheck(long userTgId)
@@ -318,14 +343,14 @@ namespace PharmaceuticalManagerBot.Methods
                 }
                 else
                 {
-                    throw new Exception($"Произошёл несчастный случай. Повторите запрос чуть позже. Если не будет работать, попробуйте повторить команду /start");
+                    throw new Exception($"Произошёл несчастный случай. Повтори запрос чуть позже. Если не будет работать, попробуй повторить команду /start");
                 }
 
             }
             catch (DbUpdateException ex)
             {
                 _logger.LogError($"Ошибка при включении режима автоматической проверки препаратов: {ex.Message}");
-                throw new Exception($"Произошла ошибка при подключении к базе данных. Повторите запрос чуть позже.");
+                throw new Exception($"Произошла ошибка при подключении к базе данных. Повтори запрос чуть позже.");
             }
         }
 
@@ -341,13 +366,13 @@ namespace PharmaceuticalManagerBot.Methods
                 }
                 else
                 {
-                    throw new Exception($"Произошёл несчастный случай. Повторите запрос чуть позже. Если не будет работать, попробуйте повторить команду /start");
+                    throw new Exception($"Произошёл несчастный случай. Повтори запрос чуть позже. Если не будет работать, попробуй повторить команду /start");
                 }
             }
             catch (DbUpdateException ex)
             {
                 _logger.LogError($"Ошибка при выключении режима автоматической проверки препаратов: {ex.Message}");
-                throw new Exception($"Произошла ошибка при подключении к базе данных. Повторите запрос чуть позже.");
+                throw new Exception($"Произошла ошибка при подключении к базе данных. Повтори запрос чуть позже.");
             }
         }
 
@@ -392,7 +417,7 @@ namespace PharmaceuticalManagerBot.Methods
                 {
                     await botClient.SendMessage(
                         chatId: chatId,
-                        text: "Произошла ошибка при поиске препарата. Пожалуйста, повторите попытку чуть позже.");
+                        text: "Произошла ошибка при поиске препарата. Пожалуйста, повтори попытку чуть позже.");
                     _logger.LogError($"Препарат под номером {medId} не был найден.");
                     
                 }
@@ -400,7 +425,7 @@ namespace PharmaceuticalManagerBot.Methods
             catch(DbUpdateException ex)
             {
                 _logger.LogError($"Ошибка удаления препарата под номером {medId}: {ex.Message}");
-                throw new Exception("Извините, я не смог удалить этот препарат. Попробуйте повторить запрос.");
+                throw new Exception("Извини, я не смог удалить этот препарат. Попробуй повторить запрос.");
             }
         }
 
