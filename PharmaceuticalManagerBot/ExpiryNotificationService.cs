@@ -55,7 +55,7 @@ namespace PharmaceuticalManagerBot
             {
                 var _context = scope.ServiceProvider.GetRequiredService<PharmaceuticalManagerBotContext>();
                 //Methods to interract with DB
-                DbMethods dbMethods = new();
+                var _dbMethods = scope.ServiceProvider.GetRequiredService<DbMethods>();
                 var today = DateOnly.FromDateTime(DateTime.Today);
                 //30 day threshold for the soon to expire meds
                 var thresholdDate = today.AddDays(30);
@@ -90,7 +90,7 @@ namespace PharmaceuticalManagerBot
                     {
                         _logger.LogWarning(ex, $"Пользователь {user.TgId} заблокировал бота.");
                         //Chat and User IDs are being stored in BigInteger format in the DB
-                        await dbMethods.DeleteUser((long)user.TgId);
+                        await _dbMethods.DeleteUser((long)user.TgId);
                     }
 
                 }

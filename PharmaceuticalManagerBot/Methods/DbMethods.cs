@@ -19,6 +19,17 @@ namespace PharmaceuticalManagerBot.Methods
     {
         private readonly ILogger<PharmaceuticalManagerBotWorker> _logger;
         private readonly PharmaceuticalManagerBotContext _context;
+        private readonly ITelegramBotClient _botClient;
+
+        public DbMethods(
+            ILogger<PharmaceuticalManagerBotWorker> logger,
+            PharmaceuticalManagerBotContext context,
+            ITelegramBotClient botClient)
+        {
+            _logger = logger;
+            _context = context;
+            _botClient = botClient;
+        }
 
         public async Task<bool> AddUser(BigInteger userTgId, BigInteger userChatId)
         {
@@ -41,7 +52,7 @@ namespace PharmaceuticalManagerBot.Methods
 
         }
 
-        public async Task<bool> AddMed (long userTgId, string med)
+        public async Task AddMed (long userTgId, string med)
         {
             if (!med.Contains('|'))
             {
@@ -73,12 +84,11 @@ namespace PharmaceuticalManagerBot.Methods
             {
                 _context.Medicines.Add(newMed);
                 await _context.SaveChangesAsync();
-                return true;
             }
             catch (DbUpdateException ex)
             {
                 _logger.LogError($"Ошибка добавления препарата: {ex.Message}");
-                return false;
+                throw new Exception("Произошла ошибка при добавлении препарата. Повторите ошибку чуть позже.");
             }
 
         }
@@ -149,9 +159,124 @@ namespace PharmaceuticalManagerBot.Methods
                         callbackData: $"med_{m.Id}")
                 })
                 .ToList();
+            //pagination buttons for navigation through the list
+            var paginationButtons = new List<InlineKeyboardButton[]>();
             
+            //adds backward button
+            if (page > 0)
+            {
+                paginationButtons.Add(new[]
+                {
+                    InlineKeyboardButton.WithCallbackData("Назад", $"page_{page - 1}")
+                });
+            }
+            //adds forward button
+            if (medListShort.Count > (page + 1) * pageSize)
+            {
+                paginationButtons.Add(new[]
+                {
+                    InlineKeyboardButton.WithCallbackData("Вперёд", $"page_{page + 1}")
+                });
+            }
+
+            var inlineKeyboard = new InlineKeyboardMarkup(buttons.Concat(paginationButtons));
+
+            await botClient.SendMessage(
+                chatId: chatId,
+                text: $"Страница {page} из {Math.Ceiling((double)(medListShort.Count / pageSize))}",
+                replyMarkup: inlineKeyboard
+                );
         }
-        public async Task<MedicineDto> GetSingleMed (int medId)
+
+        public async Task GetMedicineSoonExpireOneUser(ITelegramBotClient botClient, long chatId ,long userTgId)
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var thresholdDate = today.AddDays(30);
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.TgId == userTgId);
+            if (user != null)
+            {
+                var soonExpMeds = await _context.Medicines
+                    .AsNoTracking()
+                    .Where(m => m.UserId == user.UID)
+                    .Where(m => m.ExpiryDate >= today && m.ExpiryDate <= thresholdDate)
+                    .Select(m => new MedicineDto
+                    {
+                        Id = m.MedicineId,
+                        Name = m.Name,
+                        ExpiryDate = m.ExpiryDate
+                    })
+                    .ToListAsync();
+
+                if (soonExpMeds != null && soonExpMeds.Count > 0)
+                {
+                    string answerString = "**Срок годности истекает:**\n" + string.Join("\n", soonExpMeds.Select(m => $"- {m.Name} ({m.ExpiryDate:dd.MM.yyyy})"));
+
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: answerString);
+                }
+                else
+                {
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: "Можете спать спокойно. Все ваши лекарства и препараты в полном порядке");
+                }
+            }
+            else
+            {
+                await botClient.SendMessage(
+                        chatId: chatId,
+                        text: "Произошла ошибка. Пожалуйста, вбейте команду /start и повторите запрос");
+                _logger.LogInformation($"Ошибка поиска по ТГ айдишке для пользователя {userTgId}");
+            }
+
+        }
+
+        public async Task GetExpiredMed (ITelegramBotClient botClient, long chatId, long userTgId)
+        {
+            DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.TgId == userTgId);
+            if (user != null)
+            {
+                var expMeds = await _context.Medicines
+                    .AsNoTracking()
+                    .Where(m => m.UserId == user.UID)
+                    .Where(m => m.ExpiryDate <= today)
+                    .Select(m => new MedicineDto
+                    {
+                        Id = m.MedicineId,
+                        Name = m.Name,
+                        ExpiryDate = m.ExpiryDate
+                    })
+                    .ToListAsync();
+
+                if (expMeds != null && expMeds.Count > 0)
+                {
+                    string answerString = "**Срок годности истёк для:**\n" + string.Join("\n", expMeds.Select(m => $"- {m.Name} ({m.ExpiryDate:dd.MM.yyyy})"));
+
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: answerString);
+                }
+                else
+                {
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: "Можете спать спокойно. В вашей аптечке нет просроченных препаратов.");
+                }
+            }
+            else
+            {
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text: "Ошибка при поиске информации. Повторите запрос чуть позже.");
+                _logger.LogInformation($"Ошибка при поиске по ТГ айдишке пользователя {userTgId}");
+            }
+
+        }
+
+        public async Task GetSingleMed (ITelegramBotClient botClient, long chatId, int medId)
         {
             var medInfo = await _context.Medicines
                 .FindAsync(medId);
@@ -159,7 +284,7 @@ namespace PharmaceuticalManagerBot.Methods
             {
                 string activePhar = _context.ActivePharmIngedients.Where(a => a.ID == medInfo.ActivePharmIngredientId).Select(a => a.ActivePharmIngredientName).Single();
                 string medType = _context.MedTypes.Where(m => m.ID == medInfo.TypeId).Select(m => m.Type).Single();
-                return new MedicineDto
+                MedicineDto result = new MedicineDto
                 {
                     Id = medInfo.MedicineId,
                     Name = medInfo.Name,
@@ -167,10 +292,21 @@ namespace PharmaceuticalManagerBot.Methods
                     Type = medType,
                     ExpiryDate = medInfo.ExpiryDate
                 };
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text: $"Название: {result.Name}\n" + $"Активное вещество: {result.ActiveIngredient}\n" + $"Тип лекарства: {result.Type}\n" + $"Срок годности истекает: {result.ExpiryDate:dd:MM:yyyy}",
+                    replyMarkup: new[] 
+                    {
+                        InlineKeyboardButton.WithCallbackData("закрыть", $"close_"),
+                        InlineKeyboardButton.WithCallbackData("Удалить?", $"delete_{result.Id}")
+                    });
             }
             else
             {
-                throw new Exception("Извините, мы не смогли найти этот препарат.");
+                await botClient.SendMessage(
+                    chatId: chatId,
+                    text: "Извините, мы не смогли найти этот препарат.");
+                _logger.LogInformation($"Проблема с поиском препарата с порядковым номером {medId}");
             }
         }
 
@@ -198,7 +334,7 @@ namespace PharmaceuticalManagerBot.Methods
             catch (DbUpdateException ex)
             {
                 _logger.LogError($"Ошибка добавления активного вещества: {ex.Message}");
-                return 0;
+                throw new Exception("Произошла ошибка при добавлении препарата. Пожалуйста, повторите попытку чуть позже.");
             }
         }
 
@@ -253,42 +389,6 @@ namespace PharmaceuticalManagerBot.Methods
             }
         }
 
-        public async Task<List<MedicineDto>> GetMedicineSoonExpireOneUser (long userTgId)
-        {
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var thresholdDate = today.AddDays(30);
-
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.TgId == userTgId);
-            if (user != null)
-            {
-                var soonExpMeds = await _context.Medicines
-                    .AsNoTracking()
-                    .Where(m => m.UserId == user.UID)
-                    .Where(m => m.ExpiryDate >= today && m.ExpiryDate <= thresholdDate)
-                    .Select(m => new MedicineDto
-                    {
-                        Id = m.MedicineId,
-                        Name = m.Name,
-                        ExpiryDate = m.ExpiryDate
-                    })
-                    .ToListAsync();
-
-                if (soonExpMeds != null && soonExpMeds.Count > 0)
-                {
-                    return soonExpMeds;
-                }
-                else
-                {
-                    throw new Exception("Можете спать спокойно. Все ваши лекарства и препараты в полном порядке");
-                }
-            }
-            else
-            {
-                throw new Exception("Произошла ошибка. Пожалуйста, вбейте команду /start и повторите запрос");
-            }
-
-        }
-
         public async Task DeleteUser(long userTgId)
         {
             try
@@ -313,7 +413,7 @@ namespace PharmaceuticalManagerBot.Methods
             }
         }
         
-        public async Task<bool> DeleteSingleMed(int medId)
+        public async Task DeleteSingleMed(ITelegramBotClient botClient, long chatId, int medId)
         {
             try
             {
@@ -325,18 +425,20 @@ namespace PharmaceuticalManagerBot.Methods
                     _context.Medicines.Remove(removeMed);
                     await _context.SaveChangesAsync();
                     _logger.LogInformation($"{removeMed.Name} удалён для пользователя {removeMed.UserId}");
-                    return true;
                 }
                 else
                 {
+                    await botClient.SendMessage(
+                        chatId: chatId,
+                        text: "Произошла ошибка при поиске препарата. Пожалуйста, повторите попытку чуть позже.");
                     _logger.LogError($"Препарат под номером {medId} не был найден.");
-                    throw new Exception("Извините, я не смог удалить этот препарат. Попробуйте повторить запрос.");
+                    
                 }
             }
             catch(DbUpdateException ex)
             {
                 _logger.LogError($"Ошибка удаления препарата под номером {medId}: {ex.Message}");
-                return false;
+                throw new Exception("Извините, я не смог удалить этот препарат. Попробуйте повторить запрос.");
             }
         }
 

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PharmaceuticalManagerBot.Data;
 using Microsoft.Extensions.Configuration;
 using Telegram.Bot;
+using PharmaceuticalManagerBot.Methods;
 
 internal class Program
 {
@@ -14,6 +15,7 @@ internal class Program
         var secret = builder.Configuration;
         builder.Services.AddSingleton<ITelegramBotClient>(new TelegramBotClient(secret["TelegramApiKey"]));
         builder.Services.AddSingleton<IUserStateTracker, UserStateTracker>();
+        builder.Services.AddScoped<DbMethods>();
         builder.Services.AddHostedService<ExpiryNotificationService>();
         builder.Services.AddHostedService<PharmaceuticalManagerBotWorker>();
         builder.Services.AddDbContext<PharmaceuticalManagerBotContext>(options => options.UseNpgsql(secret["PostgresDatabase"]));
